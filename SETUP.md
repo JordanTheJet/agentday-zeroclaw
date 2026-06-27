@@ -56,3 +56,19 @@ Two ways to run it; both are **draft-only** (read-only on GitHub).
 - **Do you need Piece C?** Piece A drafts silently into the binder; Piece C is
   what *delivers* a single daily briefing to your chat and rebuilds the
   whole-day INDEX. Keep it unless you'll always open the binder folder yourself.
+
+## Sharing your ZeroClaw config safely (no secrets)
+
+To show a working ZeroClaw setup without leaking anything: **never commit
+`~/.zeroclaw/config.toml`** — it holds `paired_tokens`, provider API keys, and
+channel `bot_token`s.
+
+- **The shareable example is [`deploy/zeroclaw-cron.template.toml`](deploy/zeroclaw-cron.template.toml)** —
+  it is exactly the `gh_notif` agent + risk profile + cron jobs from a real
+  deployment, with every secret/host value replaced by a `<PLACEHOLDER>`.
+- It's self-contained: the only blocks you add to a fresh ZeroClaw config are
+  `[risk_profiles.gh_notif]`, `[agents.gh_notif*]`, and `[cron.gh_notif*]` — no
+  providers/channels/tokens are part of the example.
+- Before committing any config excerpt, verify it's clean:
+  `grep -niE 'enc2:|sk-|gho_|ghp_|api_key|bot_token|paired_tokens' <file>` must
+  return nothing.
