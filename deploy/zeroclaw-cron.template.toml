@@ -59,7 +59,7 @@ enabled = true
 model_provider = "<MODEL_SONNET>"
 risk_profile = "gh_notif"
 runtime_profile = "unbounded"
-cron_jobs = ["gh_notif_poll", "gh_notif_digest", "gh_notif_retention"]
+cron_jobs = ["gh_notif_poll", "gh_notif_digest", "gh_notif_retention", "gh_notif_ship"]
 delegate_same_risk_profile = true
 delegates = ["gh_notif_pr_reviewer", "gh_notif_issue", "gh_notif_mention", "gh_notif_author", "gh_notif_ci", "gh_notif_verifier"]
 
@@ -147,7 +147,7 @@ STATE=<HOME>/.zeroclaw/workspace/gh-notif/state
      - author (activity on a thread you started)           -> gh_notif_author
      - assign, or anything issue-shaped                    -> gh_notif_issue
    For each row call the `delegate` tool with action="delegate", agent=<chosen agent>, and prompt set to EXACTLY (substitute the row values and the PROFILE filename from the map below). Do NOT set background — call them ONE AT A TIME and wait for each result (the delegate result is the sub-agent's reply; note the file path it wrote) before delegating the next row:
-     "DRAFT-ONLY. Read <HOME>/.zeroclaw/skills/github-notification-orchestrator/agents/<PROFILE> and .../references/report-template.md. Notification: reason=<reason> type=<type> repo=<repo> number=<number> title=<title> url=<url> thread_id=<thread_id>. Gather context with READ-ONLY gh ONLY (gh pr view / gh issue view / gh api); never post, comment, review, label, close, merge, or mark-read. Write the filled report to <BINDER>/items/<NNNN>-<type>-<number>-<slug>.md following the template EXACTLY (NNNN=zero-padded row index, slug=kebab-cased title). Reply with the exact file path you wrote."
+     "DRAFT-ONLY. Read <HOME>/.zeroclaw/skills/github-notification-orchestrator/agents/<PROFILE> and .../references/report-template.md. Notification: reason=<reason> type=<type> repo=<repo> number=<number> title=<title> url=<url> thread_id=<thread_id>. Gather context with READ-ONLY gh ONLY (gh pr view / gh issue view / gh api); never post, comment, review, label, close, merge, or mark-read. Write the filled report to <BINDER>/items/<NNNN>-<type>-<number>-<slug>.md following the template EXACTLY (NNNN=zero-padded row index, slug=kebab-cased title). Set status to needs-reply/action-required/fyi as fits — NEVER 'accepted' (that flag is the human's go-ahead to post). Fill the 'Ready-to-post comment' block with ONLY the public reply text, or leave it empty if a comment is not the right move. Reply with the exact file path you wrote."
    PROFILE map: gh_notif_pr_reviewer->pr-review-responder.md; gh_notif_ci->ci-failure-investigator.md; gh_notif_mention->mention-responder.md; gh_notif_author->author-activity-responder.md; gh_notif_issue->issue-responder.md.
 5. VERIFY. For each PR-review draft that completed in step 4, call `delegate` ONCE more (no background): agent=gh_notif_verifier, prompt: "Adversarially verify the draft at <that file path> against the live PR using READ-ONLY gh. Append a 'Verifier verdict' section to that same file stating whether each claim is supported and flagging any overstatement or build regression. Draft-only; never post. Reply with the file path."
 6. Run: bash "$SKILL"/scripts/notifications_delta.sh commit "$STATE" "$BINDER"  (so these are not redrafted next tick). Only commit AFTER the delegated drafts succeeded; if a row's sub-agent failed, leave it uncommitted so it retries next tick.
@@ -203,3 +203,20 @@ command = "bash <HOME>/.zeroclaw/bin/gh-notif-retention.sh"
 [cron.gh_notif_retention.schedule]
 kind = "cron"
 expr = "0 4 * * *"
+
+# ── Phase 2 (OPTIONAL): shipper — post drafts you ACCEPT, as comments ─────────
+# When you read a draft in the private drafts repo and set its frontmatter
+# `status: accepted`, this job posts that draft's "Ready-to-post comment" block to
+# the thread as a COMMENT via gh. It is DETERMINISTIC (no LLM in the posting path)
+# and comments ONLY — never review/approve/request-changes/merge/close/label.
+# Ships DISABLED: flip enabled=true for hands-off auto-post of accepted drafts, or
+# run scripts/ship_accepted.py <workspace> (dry-run by default; add --post) by hand.
+[cron.gh_notif_ship]
+name = "GitHub notification shipper (post accepted drafts)"
+enabled = false
+job_type = "shell"
+command = "python3 <HOME>/.zeroclaw/skills/github-notification-orchestrator/scripts/ship_accepted.py <HOME>/.zeroclaw/workspace/gh-notif --post"
+
+[cron.gh_notif_ship.schedule]
+kind = "every"
+every_ms = 900000

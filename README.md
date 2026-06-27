@@ -93,5 +93,7 @@ there's nothing repo-specific to configure. See **[`SETUP.md`](SETUP.md)** for:
 
 Every agent is **read-only on GitHub** and writes drafts to local files. Nothing
 is posted/reviewed/labeled/closed/marked-read without an explicit, per-action OK.
-See
+Acting on a draft is opt-in: you set a draft's `status: accepted`, and a
+deterministic shipper posts just its marked reply block as a **comment** (never a
+review/approval/merge/close/label) — see [`SETUP.md`](SETUP.md). See
 [`safety.md`](.claude/skills/github-notification-orchestrator/references/safety.md).

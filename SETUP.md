@@ -68,6 +68,27 @@ masked GitHub link to that draft's rendered summary, and `build_index.py` emits
 absolute GitHub URLs. **Keep this repo private** — the drafts contain unsent
 replies and candid verifier verdicts about other people's PRs; never publish them.
 
+### Optional: accept → post (the shipper)
+Each draft carries a "Ready-to-post comment" block and `status: needs-reply`. To act:
+1. Read the draft (in the private repo, from anywhere). Edit the block if needed,
+   set its frontmatter to `status: accepted`, and commit.
+2. The **shipper** posts that block to the thread as a **comment** via `gh` —
+   deterministically (no LLM in the posting path), comments ONLY (never
+   review/approve/merge/close/label) — then flips the draft to `status: posted`
+   and records the comment URL.
+
+Run it either way:
+- **Manual:** `python3 ~/.zeroclaw/skills/github-notification-orchestrator/scripts/ship_accepted.py ~/.zeroclaw/workspace/gh-notif`
+  — dry-run by default (prints exactly what it WOULD post); add `--post` to send,
+  `--repo OWNER/REPO` / `--only SUBSTR` to scope a run.
+- **Hands-off:** flip `enabled = true` on `[cron.gh_notif_ship]`; it sweeps
+  accepted drafts every 15 min.
+
+Safety: the drafting agents always write `status: needs-reply` and never
+`accepted` — that flag is *your* go-ahead, so nothing posts until you accept it.
+Posting is comments-only and idempotent (an accepted draft posts once, then
+becomes `posted`). Start with the manual dry-run before enabling the cron.
+
 ### Notes
 - **First-run cap.** The poll prompt caps drafts per tick, and seeding (step 3)
   means only *new* notifications draft — so you never get a backlog burst. The
