@@ -22,7 +22,7 @@ Two from-scratch [agentskills.io](https://agentskills.io)-spec skills:
 | Skill | What it does |
 |---|---|
 | [`github-notification-orchestrator`](.claude/skills/github-notification-orchestrator/) | The orchestrator: plan → fan out → verify → digest → compose |
-| [`github-prior-art`](.claude/skills/github-prior-art/) | Read-only duplicate / prior-art check (issues + PRs, by anyone) before you file or draft |
+| [`github-duplicate-check`](.claude/skills/github-duplicate-check/) | Read-only duplicate / prior-art check (issues + PRs, by anyone) before you file or draft |
 
 The orchestrator bundles **7 model-matched agent profiles** + 2 scheduled-agent
 prompts:

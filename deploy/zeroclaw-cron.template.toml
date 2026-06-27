@@ -14,7 +14,7 @@ require_approval_for_medium_risk = false
 sandbox_enabled = false
 workspace_only = false
 auto_approve = ["shell", "file_read", "file_write", "memory_recall", "http_request"]
-allowed_roots = ["<HOME>/.zeroclaw/workspace/gh-notif", "<HOME>/.zeroclaw/skills/github-notification-orchestrator", "<HOME>/.zeroclaw/skills/github-prior-art"]
+allowed_roots = ["<HOME>/.zeroclaw/workspace/gh-notif", "<HOME>/.zeroclaw/skills/github-notification-orchestrator", "<HOME>/.zeroclaw/skills/github-duplicate-check"]
 forbidden_paths = ["~/.ssh", "~/.gnupg", "~/.aws"]
 
 [agents.gh_notif]

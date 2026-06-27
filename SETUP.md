@@ -13,7 +13,7 @@ Two ways to run it; both are **draft-only** (read-only on GitHub).
 
 ## Option A — Claude Code (interactive)
 1. Copy `.claude/skills/github-notification-orchestrator` and
-   `.claude/skills/github-prior-art` into your project's `.claude/skills/` (or
+   `.claude/skills/github-duplicate-check` into your project's `.claude/skills/` (or
    `~/.claude/skills/`).
 2. `gh auth login`.
 3. Say **"orchestrate my notifications"** (or `/github-notification-orchestrator`).
