@@ -58,8 +58,9 @@ collation — in [`model-selection-rationale.md`](model-selection-rationale.md).
   `gh_notif_verifier` (opus) on every PR-review draft. Delegation is
   **synchronous and serial** (one sub-agent at a time, capped at the 5 newest
   per tick); the orchestrator commits its `seen.tsv` state at the end. A daily
-  9am cron delivers the digest (with clickable links) to Discord, and a
-  retention cron prunes old binders.
+  9am cron delivers the digest to Discord — every line a tappable link to that
+  draft's full summary in a private drafts repo — and a retention cron prunes
+  old binders.
 - **Verified live (2026-06-27):** one tick drafted **5 notifications routed to 5
   distinct sub-agents** (pr_reviewer, mention, ci, author, issue) plus **1
   verifier verdict** on the PR-review draft, then committed state —

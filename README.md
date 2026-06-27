@@ -85,7 +85,9 @@ there's nothing repo-specific to configure. See **[`SETUP.md`](SETUP.md)** for:
   `gh_notif_author`/sonnet, `gh_notif_ci`/sonnet) — synchronously, one at a time,
   bounded by a per-tick cap, with the opus verifier re-checking each PR-review
   draft before the script commits state. Piece C delivers a daily digest to your
-  channel.
+  channel — and (optionally) mirrors the drafts to a **private** GitHub repo so
+  every digest line is a tappable link to that draft's full summary from chat or
+  mobile.
 
 ## Safety
 

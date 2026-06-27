@@ -11,6 +11,10 @@
 #   <DISCORD_CHANNEL_ID> -> the chat id the daily digest is delivered to
 # The poll + digest crons ship enabled=false — flip to true when ready.
 # This mirrors a verified-working deployment; see SETUP.md for the full steps.
+# OPTIONAL: the poll + digest also mirror drafts to a PRIVATE GitHub repo so the
+# digest's links are tappable from chat/mobile. It is a no-op until you create
+# that repo and write its slug to <HOME>/.zeroclaw/workspace/gh-notif/.drafts-remote
+# (one line, e.g. "you/gh-notif-drafts"). See SETUP.md — keep that repo private.
 
 # ── Risk profiles ────────────────────────────────────────────────────────────
 # The orchestrator (gh_notif) may delegate; the workers may not (locked down).
@@ -147,6 +151,7 @@ STATE=<HOME>/.zeroclaw/workspace/gh-notif/state
    PROFILE map: gh_notif_pr_reviewer->pr-review-responder.md; gh_notif_ci->ci-failure-investigator.md; gh_notif_mention->mention-responder.md; gh_notif_author->author-activity-responder.md; gh_notif_issue->issue-responder.md.
 5. VERIFY. For each PR-review draft that completed in step 4, call `delegate` ONCE more (no background): agent=gh_notif_verifier, prompt: "Adversarially verify the draft at <that file path> against the live PR using READ-ONLY gh. Append a 'Verifier verdict' section to that same file stating whether each claim is supported and flagging any overstatement or build regression. Draft-only; never post. Reply with the file path."
 6. Run: bash "$SKILL"/scripts/notifications_delta.sh commit "$STATE" "$BINDER"  (so these are not redrafted next tick). Only commit AFTER the delegated drafts succeeded; if a row's sub-agent failed, leave it uncommitted so it retries next tick.
+7. Run: bash "$SKILL"/scripts/publish_drafts.sh <HOME>/.zeroclaw/workspace/gh-notif  (mirror today's drafts to your PRIVATE drafts repo so they are reachable from chat/mobile; pushes to YOUR private repo ONLY and never posts upstream. No-op until you create <HOME>/.zeroclaw/workspace/gh-notif/.drafts-remote — see SETUP.md).
 Reply with ONE line: delegated N (agents used: <list>), verified V, deferred M, binder=<BINDER>. Nothing was posted.
 """
 
@@ -166,12 +171,15 @@ prompt = """
 You are an automated DRAFT-ONLY daily digest job. Your reply IS the chat message that gets posted, so output ONLY the finished content: no narration, no tool mentions, no reasoning. Never ask questions.
 
 SKILL=<HOME>/.zeroclaw/skills/github-notification-orchestrator
+WS=<HOME>/.zeroclaw/workspace/gh-notif
 
-1. Run `date +%F` -> DATE; BINDER=<HOME>/.zeroclaw/workspace/gh-notif/triage/<DATE>.
+1. Run `date +%F` -> DATE; BINDER=$WS/triage/<DATE>.
 2. If "$BINDER"/items does not exist or is empty, output EXACTLY one line and stop:
 **GitHub Notification Digest — <DATE>** — nothing new drafted today.
-3. Otherwise run: python3 "$SKILL"/scripts/build_index.py "$BINDER"  (builds INDEX.md, newest-first, grouped by priority). Read "$BINDER"/INDEX.md.
-4. Output a concise digest. FIRST line EXACTLY: **GitHub Notification Digest — <DATE>**. Then, for EACH P1 "needs you" item, one line: a masked clickable link [#number title](<url>) — the one-line ask (from that report's "Who needs what from you"). Then a one-line count of P2/P3 with each as a masked link [#number](<url>) too. Make EVERY link a masked link [text](<url>) — the text is clickable and the URL is wrapped in angle brackets so chat shows no preview card. End with a footer line exactly: `Full drafts on host: <BINDER>`. No images.
+3. Run: python3 "$SKILL"/scripts/build_index.py "$BINDER"  (builds INDEX.md; each item links to its full draft summary in the private drafts repo, if one is configured).
+4. Run: bash "$SKILL"/scripts/publish_drafts.sh "$WS"  (push today's drafts + INDEX to the PRIVATE drafts repo so the links resolve from chat/mobile; pushes to YOUR private repo ONLY, never posts upstream; no-op until .drafts-remote is set).
+5. Read "$BINDER"/INDEX.md. If a drafts repo is configured, each item bullet contains an absolute https://github.com/.../items/<file>.md link to that draft's full summary plus a "📂 All drafts (INDEX)" link; otherwise links are repo-relative.
+6. Output a concise digest. FIRST line EXACTLY: **GitHub Notification Digest — <DATE>**. Then, for EACH P1 "needs you" item, one line: a masked clickable link [#number title](<DRAFT_URL>) — the one-line ask (from that report's "Who needs what from you"), where DRAFT_URL is that item's draft-summary link copied from INDEX.md. Then a one-line count of P2/P3, each as a masked link [#number](<DRAFT_URL>). Make EVERY link a masked link [text](<url>) with the URL wrapped in angle brackets so chat shows no preview card. End with a footer line linking the INDEX: All drafts: [triage/<DATE>](<INDEX_URL>). No images.
 """
 
 [cron.gh_notif_digest.schedule]

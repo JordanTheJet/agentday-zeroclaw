@@ -55,6 +55,19 @@ Two ways to run it; both are **draft-only** (read-only on GitHub).
    and `[cron.gh_notif_retention]` once its script is installed) when ready. Start
    the poll at **every 30 min** to feel out cost, then tighten.
 
+### Optional: clickable digest links (private drafts repo)
+By default the digest footer points at the on-host binder path. To get **tappable
+links to each draft from chat/mobile**, mirror the binder to a *private* GitHub repo:
+1. Create a private repo: `gh repo create <you>/gh-notif-drafts --private --add-readme`
+2. Tell the publisher where it lives:
+   `echo "<you>/gh-notif-drafts" > ~/.zeroclaw/workspace/gh-notif/.drafts-remote`
+
+That's it — the poll and digest crons already call `publish_drafts.sh`, which is a
+no-op until `.drafts-remote` exists. Once set, every line of the daily digest is a
+masked GitHub link to that draft's rendered summary, and `build_index.py` emits
+absolute GitHub URLs. **Keep this repo private** — the drafts contain unsent
+replies and candid verifier verdicts about other people's PRs; never publish them.
+
 ### Notes
 - **First-run cap.** The poll prompt caps drafts per tick, and seeding (step 3)
   means only *new* notifications draft — so you never get a backlog burst. The
