@@ -1,0 +1,5 @@
+# personal inbox data — never commit
+triage/
+.context/
+tmp/
+*.log

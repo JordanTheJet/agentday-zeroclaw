@@ -1,0 +1,82 @@
+# ── GitHub notification orchestrator — ZeroClaw deployment (Piece A + C) ──────
+# Append this to ~/.zeroclaw/config.toml (BACK IT UP FIRST). Replace placeholders:
+#   <HOME>               -> your home dir, e.g. /Users/you   (paths below)
+#   <MODEL_PROVIDER>     -> a configured provider alias, e.g. anthropic.default
+#   <DISCORD_CHANNEL_ID> -> the chat id the daily digest is delivered to
+# Both cron jobs ship enabled=false — flip to true when ready (poll starts at 30m).
+# This mirrors a verified-working deployment; see SETUP.md for the full steps.
+
+[risk_profiles.gh_notif]
+level = "full"
+allowed_commands = ["*"]
+block_high_risk_commands = false
+require_approval_for_medium_risk = false
+sandbox_enabled = false
+workspace_only = false
+auto_approve = ["shell", "file_read", "file_write", "memory_recall", "http_request"]
+allowed_roots = ["<HOME>/.zeroclaw/workspace/gh-notif", "<HOME>/.zeroclaw/skills/github-notification-orchestrator", "<HOME>/.zeroclaw/skills/github-prior-art"]
+forbidden_paths = ["~/.ssh", "~/.gnupg", "~/.aws"]
+
+[agents.gh_notif]
+enabled = true
+model_provider = "<MODEL_PROVIDER>"
+risk_profile = "gh_notif"
+runtime_profile = "unbounded"
+cron_jobs = ["gh_notif_poll", "gh_notif_digest"]
+
+[agents.gh_notif.identity]
+format = "openclaw"
+
+[cron.gh_notif_poll]
+name = "GitHub notification poll-and-delegate (Piece A)"
+enabled = false
+job_type = "agent"
+uses_memory = false
+session_target = "isolated"
+allowed_tools = ["shell", "file_read", "file_write"]
+prompt = """
+You are an automated, DRAFT-ONLY GitHub notification triage tick. You only write local draft files; you NEVER post, comment, review, label, close, merge, or mark anything read. Never ask questions. Work through items ONE AT A TIME.
+
+SKILL=<HOME>/.zeroclaw/skills/github-notification-orchestrator
+STATE=<HOME>/.zeroclaw/workspace/gh-notif/state
+
+1. Compute today's date and binder: run `date +%F` -> DATE; BINDER=<HOME>/.zeroclaw/workspace/gh-notif/triage/<DATE>.
+2. Run: bash "$SKILL"/scripts/notifications_delta.sh delta "$STATE" "$BINDER"  (read-only gh fetch + diff vs seen.tsv). Read "$BINDER"/new.tsv. Columns: reason  type  repo  number  title  updated_at  url  thread_id.
+3. Cap: process at most the 5 newest rows this tick. If there are more, note how many you deferred (they surface next tick).
+4. For each row: pick the matching profile in "$SKILL"/agents using "$SKILL"/references/routing.md (review_requested or code PR mention -> pr-review-responder; mention/comment -> mention-responder; author -> author-activity-responder; assign or issue -> issue-responder; ci_activity -> ci-failure-investigator). Read that profile + "$SKILL"/references/report-template.md, gather context with READ-ONLY gh (gh pr view / gh issue view / gh api), and write the filled report to "$BINDER"/items/<NNNN>-<type>-<number>-<slug>.md following the template exactly. Draft only.
+5. Run: bash "$SKILL"/scripts/notifications_delta.sh commit "$STATE" "$BINDER"  (so these are not redrafted next tick).
+Reply with ONE line: drafted N, deferred M, binder=<BINDER>. Nothing was posted.
+"""
+
+[cron.gh_notif_poll.schedule]
+kind = "every"
+every_ms = 1800000
+
+[cron.gh_notif_digest]
+name = "GitHub notification daily digest (Piece C)"
+enabled = false
+job_type = "agent"
+uses_memory = false
+session_target = "isolated"
+allowed_tools = ["shell", "file_read"]
+prompt = """
+You are an automated DRAFT-ONLY daily digest job. Your reply IS the chat message that gets posted, so output ONLY the finished content: no narration, no tool mentions, no reasoning. Never ask questions.
+
+SKILL=<HOME>/.zeroclaw/skills/github-notification-orchestrator
+
+1. Run `date +%F` -> DATE; BINDER=<HOME>/.zeroclaw/workspace/gh-notif/triage/<DATE>.
+2. If "$BINDER"/items does not exist or is empty, output EXACTLY one line and stop:
+**GitHub Notification Digest — <DATE>** — nothing new drafted today.
+3. Otherwise run: python3 "$SKILL"/scripts/build_index.py "$BINDER"  (builds INDEX.md, newest-first, grouped by priority). Read "$BINDER"/INDEX.md.
+4. Output a concise digest. FIRST line EXACTLY: **GitHub Notification Digest — <DATE>**. Then the P1 "needs you" items (each: #number title — one-line ask), then a one-line count of P2/P3. Mask every link with the URL in <angle brackets> so chat shows no preview card. No images.
+"""
+
+[cron.gh_notif_digest.schedule]
+kind = "cron"
+expr = "0 9 * * *"
+
+[cron.gh_notif_digest.delivery]
+mode = "announce"
+channel = "discord.default"
+to = "<DISCORD_CHANNEL_ID>"
+best_effort = true
