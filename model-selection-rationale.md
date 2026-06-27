@@ -62,8 +62,39 @@ summarizer (its work is mechanical and Haiku doesn't expose the effort knob).
 
 In the Claude Code fan-out, each sub-agent runs at its profile's recommended
 model via the Agent tool's `model` override — the per-role table above applies
-directly. In the **ZeroClaw cron deployment** (`gh_notif` agent), a single agent
-currently drafts each item at **one** model (`claude-sonnet-4-6`); to get true
-per-profile models there, define one ZeroClaw agent per profile and delegate to
-them via `DelegateTool` (a documented future enhancement). The orchestration
-judgment (the main loop) stays on **opus** in both modes.
+directly. The **ZeroClaw cron deployment** now realizes the same per-profile
+model selection natively: a poll cron runs the orchestrator agent `gh_notif`,
+which routes each new notification and hands it to ONE of six per-profile
+sub-agents via ZeroClaw's built-in `delegate` tool (PR-review drafts get a second
+delegation to the adversarial verifier). Delegation is **synchronous/serial** —
+the orchestrator delegates one sub-agent at a time and waits for each to return,
+bounded by a per-tick cap of the 5 newest notifications. This is per-profile
+model selection without `Agent`/`Task`: each ZeroClaw agent alias pins its own
+model.
+
+### Profile → ZeroClaw alias → model
+
+The seven roles below map one-to-one onto the orchestrator plus the six
+per-profile sub-agent aliases. Models follow the same reasoning as the per-role
+table: **opus** for code review and adversarial verification (the high-blast-radius,
+intelligence-sensitive work), **sonnet** for the structured middle (issue,
+mention, authored-thread, CI), and **haiku** for the deterministic daily index
+build.
+
+| Profile | ZeroClaw alias | Model | Routed on |
+|---|---|---|---|
+| (orchestrator) | `gh_notif` | **sonnet** | routing + delegation, not deep reasoning |
+| `pr-review-responder.md` | `gh_notif_pr_reviewer` | **opus** | review_requested / code PR mention |
+| `verifier.md` | `gh_notif_verifier` | **opus** | adversarial quality gate on PR drafts |
+| `issue-responder.md` | `gh_notif_issue` | **sonnet** | assign / issue |
+| `mention-responder.md` | `gh_notif_mention` | **sonnet** | mention / comment |
+| `author-activity-responder.md` | `gh_notif_author` | **sonnet** | activity on a thread you started |
+| `ci-failure-investigator.md` | `gh_notif_ci` | **sonnet** | ci_activity / check_suite |
+
+The opus/sonnet split is identical to the per-role table; the one deliberate
+difference from the Claude Code path is the **orchestrator tier**: the ZeroClaw
+`gh_notif` orchestrator runs on **sonnet** (its job is reason/type routing and
+delegation, not the deep planning of a 100+ item inbox), whereas the Claude Code
+main loop stays on **opus**. The deterministic daily index build (`daily-summarizer`
+→ haiku) is not a delegated worker — the delta/index scripting is mechanical, so
+it stays on the cheapest fast model exactly as the per-role table prescribes.

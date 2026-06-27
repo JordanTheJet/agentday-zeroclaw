@@ -1,10 +1,21 @@
 # ── GitHub notification orchestrator — ZeroClaw deployment (Piece A + C) ──────
+# A multi-agent, DRAFT-ONLY fan-out: a poll cron (gh_notif) routes each new
+# notification to one of six per-profile sub-agents via ZeroClaw's `delegate`
+# tool — no Claude Code, no external orchestrator. A daily digest cron delivers
+# the briefing to chat; a retention cron prunes old binders.
+#
 # Append this to ~/.zeroclaw/config.toml (BACK IT UP FIRST). Replace placeholders:
-#   <HOME>               -> your home dir, e.g. /Users/you   (paths below)
-#   <MODEL_PROVIDER>     -> a configured provider alias, e.g. anthropic.default
+#   <HOME>               -> your home dir, e.g. /Users/you   (all paths below)
+#   <MODEL_SONNET>       -> a mid-tier provider alias, e.g. anthropic.default   (sonnet)
+#   <MODEL_OPUS>         -> a top-tier provider alias,  e.g. anthropic.opus      (opus)
 #   <DISCORD_CHANNEL_ID> -> the chat id the daily digest is delivered to
-# Both cron jobs ship enabled=false — flip to true when ready (poll starts at 30m).
+# The poll + digest crons ship enabled=false — flip to true when ready.
 # This mirrors a verified-working deployment; see SETUP.md for the full steps.
+
+# ── Risk profiles ────────────────────────────────────────────────────────────
+# The orchestrator (gh_notif) may delegate; the workers may not (locked down).
+# Both profiles are identical on every axis EXCEPT delegation_policy, so a worker
+# can never escalate beyond the orchestrator (ZeroClaw's no-escalation guard).
 
 [risk_profiles.gh_notif]
 level = "full"
@@ -17,15 +28,97 @@ auto_approve = ["shell", "file_read", "file_write", "memory_recall", "http_reque
 allowed_roots = ["<HOME>/.zeroclaw/workspace/gh-notif", "<HOME>/.zeroclaw/skills/github-notification-orchestrator", "<HOME>/.zeroclaw/skills/github-duplicate-check"]
 forbidden_paths = ["~/.ssh", "~/.gnupg", "~/.aws"]
 
+[risk_profiles.gh_notif.delegation_policy]
+mode = "allow"
+
+[risk_profiles.gh_notif_worker]
+level = "full"
+allowed_commands = ["*"]
+block_high_risk_commands = false
+require_approval_for_medium_risk = false
+sandbox_enabled = false
+workspace_only = false
+auto_approve = ["shell", "file_read", "file_write", "memory_recall", "http_request"]
+allowed_roots = ["<HOME>/.zeroclaw/workspace/gh-notif", "<HOME>/.zeroclaw/skills/github-notification-orchestrator", "<HOME>/.zeroclaw/skills/github-duplicate-check"]
+forbidden_paths = ["~/.ssh", "~/.gnupg", "~/.aws"]
+
+[risk_profiles.gh_notif_worker.delegation_policy]
+mode = "forbidden"
+
+# ── Orchestrator agent (runs the poll + digest + retention crons) ─────────────
+# delegates[] lists the six sub-agents it may hand work to (cross-profile, so the
+# explicit roster is required); delegate_same_risk_profile adds same-profile peers
+# (none here). reachable = same-profile peers ∪ delegates − self.
+
 [agents.gh_notif]
 enabled = true
-model_provider = "<MODEL_PROVIDER>"
+model_provider = "<MODEL_SONNET>"
 risk_profile = "gh_notif"
 runtime_profile = "unbounded"
-cron_jobs = ["gh_notif_poll", "gh_notif_digest"]
+cron_jobs = ["gh_notif_poll", "gh_notif_digest", "gh_notif_retention"]
+delegate_same_risk_profile = true
+delegates = ["gh_notif_pr_reviewer", "gh_notif_issue", "gh_notif_mention", "gh_notif_author", "gh_notif_ci", "gh_notif_verifier"]
 
 [agents.gh_notif.identity]
 format = "openclaw"
+
+# ── Six per-profile sub-agents (model-matched) ────────────────────────────────
+# opus for code review + adversarial verification; sonnet for the structured
+# middle (issues, mentions, authored threads, CI). Each runs read-only gh and
+# writes ONE draft file. See model-selection-rationale.md for the reasoning.
+
+[agents.gh_notif_pr_reviewer]
+enabled = true
+model_provider = "<MODEL_OPUS>"
+risk_profile = "gh_notif_worker"
+runtime_profile = "unbounded"
+[agents.gh_notif_pr_reviewer.identity]
+format = "openclaw"
+
+[agents.gh_notif_verifier]
+enabled = true
+model_provider = "<MODEL_OPUS>"
+risk_profile = "gh_notif_worker"
+runtime_profile = "unbounded"
+[agents.gh_notif_verifier.identity]
+format = "openclaw"
+
+[agents.gh_notif_issue]
+enabled = true
+model_provider = "<MODEL_SONNET>"
+risk_profile = "gh_notif_worker"
+runtime_profile = "unbounded"
+[agents.gh_notif_issue.identity]
+format = "openclaw"
+
+[agents.gh_notif_mention]
+enabled = true
+model_provider = "<MODEL_SONNET>"
+risk_profile = "gh_notif_worker"
+runtime_profile = "unbounded"
+[agents.gh_notif_mention.identity]
+format = "openclaw"
+
+[agents.gh_notif_author]
+enabled = true
+model_provider = "<MODEL_SONNET>"
+risk_profile = "gh_notif_worker"
+runtime_profile = "unbounded"
+[agents.gh_notif_author.identity]
+format = "openclaw"
+
+[agents.gh_notif_ci]
+enabled = true
+model_provider = "<MODEL_SONNET>"
+risk_profile = "gh_notif_worker"
+runtime_profile = "unbounded"
+[agents.gh_notif_ci.identity]
+format = "openclaw"
+
+# ── Piece A: poll-and-delegate cron (the fan-out) ─────────────────────────────
+# Note `delegate` in allowed_tools — that's what lets the orchestrator hand work
+# to the sub-agents. Delegation is SYNCHRONOUS (one sub-agent at a time): robust
+# in both `zeroclaw agent` and the daemon, and bounded by the per-tick cap.
 
 [cron.gh_notif_poll]
 name = "GitHub notification poll-and-delegate (Piece A)"
@@ -33,25 +126,35 @@ enabled = false
 job_type = "agent"
 uses_memory = false
 session_target = "isolated"
-allowed_tools = ["shell", "file_read", "file_write"]
+allowed_tools = ["shell", "file_read", "file_write", "delegate"]
 prompt = """
-You are an automated, DRAFT-ONLY GitHub notification triage tick. You only write local draft files; you NEVER post, comment, review, label, close, merge, or mark anything read. Never ask questions. Work through items ONE AT A TIME.
+You are an automated, DRAFT-ONLY GitHub notification triage ORCHESTRATOR tick. You only cause local draft files to be written; you NEVER post, comment, review, label, close, merge, or mark anything read. Never ask questions. You DELEGATE the per-notification drafting to specialist sub-agents, one at a time, and wait for each to return.
 
 SKILL=<HOME>/.zeroclaw/skills/github-notification-orchestrator
 STATE=<HOME>/.zeroclaw/workspace/gh-notif/state
 
 1. Compute today's date and binder: run `date +%F` -> DATE; BINDER=<HOME>/.zeroclaw/workspace/gh-notif/triage/<DATE>.
-2. Run: bash "$SKILL"/scripts/notifications_delta.sh delta "$STATE" "$BINDER"  (read-only gh fetch + diff vs seen.tsv). Read "$BINDER"/new.tsv. Columns: reason  type  repo  number  title  updated_at  url  thread_id.
-3. Cap: process at most the 5 newest rows this tick. If there are more, note how many you deferred (they surface next tick).
-4. For each row: pick the matching profile in "$SKILL"/agents using "$SKILL"/references/routing.md (review_requested or code PR mention -> pr-review-responder; mention/comment -> mention-responder; author -> author-activity-responder; assign or issue -> issue-responder; ci_activity -> ci-failure-investigator). Read that profile + "$SKILL"/references/report-template.md, gather context with READ-ONLY gh (gh pr view / gh issue view / gh api), and write the filled report to "$BINDER"/items/<NNNN>-<type>-<number>-<slug>.md following the template exactly. Draft only.
-5. Run: bash "$SKILL"/scripts/notifications_delta.sh commit "$STATE" "$BINDER"  (so these are not redrafted next tick).
-Reply with ONE line: drafted N, deferred M, binder=<BINDER>. Nothing was posted.
+2. Run: bash "$SKILL"/scripts/notifications_delta.sh delta "$STATE" "$BINDER"  (read-only gh fetch + diff vs seen.tsv). Read "$BINDER"/new.tsv. Columns (tab-separated): reason  type  repo  number  title  updated_at  url  thread_id. If new.tsv is empty or missing, skip to step 6.
+3. Cap: take at most the 5 newest rows this tick; count the rest as deferred (they surface next tick).
+4. ROUTE + DELEGATE. For EACH row choose ONE sub-agent by reason/type (see "$SKILL"/references/routing.md):
+     - review_requested, or a mention on a PR about code  -> gh_notif_pr_reviewer
+     - ci_activity / check_suite / workflow run            -> gh_notif_ci
+     - mention or comment (not a thread you started)       -> gh_notif_mention
+     - author (activity on a thread you started)           -> gh_notif_author
+     - assign, or anything issue-shaped                    -> gh_notif_issue
+   For each row call the `delegate` tool with action="delegate", agent=<chosen agent>, and prompt set to EXACTLY (substitute the row values and the PROFILE filename from the map below). Do NOT set background — call them ONE AT A TIME and wait for each result (the delegate result is the sub-agent's reply; note the file path it wrote) before delegating the next row:
+     "DRAFT-ONLY. Read <HOME>/.zeroclaw/skills/github-notification-orchestrator/agents/<PROFILE> and .../references/report-template.md. Notification: reason=<reason> type=<type> repo=<repo> number=<number> title=<title> url=<url> thread_id=<thread_id>. Gather context with READ-ONLY gh ONLY (gh pr view / gh issue view / gh api); never post, comment, review, label, close, merge, or mark-read. Write the filled report to <BINDER>/items/<NNNN>-<type>-<number>-<slug>.md following the template EXACTLY (NNNN=zero-padded row index, slug=kebab-cased title). Reply with the exact file path you wrote."
+   PROFILE map: gh_notif_pr_reviewer->pr-review-responder.md; gh_notif_ci->ci-failure-investigator.md; gh_notif_mention->mention-responder.md; gh_notif_author->author-activity-responder.md; gh_notif_issue->issue-responder.md.
+5. VERIFY. For each PR-review draft that completed in step 4, call `delegate` ONCE more (no background): agent=gh_notif_verifier, prompt: "Adversarially verify the draft at <that file path> against the live PR using READ-ONLY gh. Append a 'Verifier verdict' section to that same file stating whether each claim is supported and flagging any overstatement or build regression. Draft-only; never post. Reply with the file path."
+6. Run: bash "$SKILL"/scripts/notifications_delta.sh commit "$STATE" "$BINDER"  (so these are not redrafted next tick). Only commit AFTER the delegated drafts succeeded; if a row's sub-agent failed, leave it uncommitted so it retries next tick.
+Reply with ONE line: delegated N (agents used: <list>), verified V, deferred M, binder=<BINDER>. Nothing was posted.
 """
 
 [cron.gh_notif_poll.schedule]
 kind = "every"
 every_ms = 1800000
 
+# ── Piece C: daily digest cron (delivers the briefing to chat) ────────────────
 [cron.gh_notif_digest]
 name = "GitHub notification daily digest (Piece C)"
 enabled = false
@@ -68,7 +171,7 @@ SKILL=<HOME>/.zeroclaw/skills/github-notification-orchestrator
 2. If "$BINDER"/items does not exist or is empty, output EXACTLY one line and stop:
 **GitHub Notification Digest — <DATE>** — nothing new drafted today.
 3. Otherwise run: python3 "$SKILL"/scripts/build_index.py "$BINDER"  (builds INDEX.md, newest-first, grouped by priority). Read "$BINDER"/INDEX.md.
-4. Output a concise digest. FIRST line EXACTLY: **GitHub Notification Digest — <DATE>**. Then the P1 "needs you" items (each: #number title — one-line ask), then a one-line count of P2/P3. Mask every link with the URL in <angle brackets> so chat shows no preview card. No images.
+4. Output a concise digest. FIRST line EXACTLY: **GitHub Notification Digest — <DATE>**. Then, for EACH P1 "needs you" item, one line: a masked clickable link [#number title](<url>) — the one-line ask (from that report's "Who needs what from you"). Then a one-line count of P2/P3 with each as a masked link [#number](<url>) too. Make EVERY link a masked link [text](<url>) — the text is clickable and the URL is wrapped in angle brackets so chat shows no preview card. End with a footer line exactly: `Full drafts on host: <BINDER>`. No images.
 """
 
 [cron.gh_notif_digest.schedule]
@@ -80,3 +183,15 @@ mode = "announce"
 channel = "discord.default"
 to = "<DISCORD_CHANNEL_ID>"
 best_effort = true
+
+# ── Retention cron (prunes binders older than 14 days) ────────────────────────
+# Install the prune script first (see SETUP.md), then flip enabled=true.
+[cron.gh_notif_retention]
+name = "GitHub notification binder retention (>14d)"
+enabled = false
+job_type = "shell"
+command = "bash <HOME>/.zeroclaw/bin/gh-notif-retention.sh"
+
+[cron.gh_notif_retention.schedule]
+kind = "cron"
+expr = "0 4 * * *"

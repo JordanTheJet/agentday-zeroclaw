@@ -48,10 +48,25 @@ collation — in [`model-selection-rationale.md`](model-selection-rationale.md).
 ## Proof it works
 - A real run over a **145-notification inbox** is bundled in
   [`examples/run-2026-06-27/`](.claude/skills/github-notification-orchestrator/examples/run-2026-06-27/).
-- **Deployed live on a ZeroClaw instance:** a poll-and-delegate cron drafts new
-  notifications every 30 min, a daily 9am cron delivers the digest (with
-  clickable links) to Discord, and a retention cron prunes old binders — running
-  now.
+- **Deployed live on a ZeroClaw instance** as a genuine, **ZeroClaw-native
+  multi-agent fan-out** — no Claude Code dependency. A poll cron runs the
+  orchestrator agent `gh_notif` (sonnet): it runs a read-only delta script to
+  find *new* notifications, routes each by reason/type, and uses ZeroClaw's
+  built-in `delegate` tool to hand it to one of **6 model-matched sub-agents** —
+  `gh_notif_pr_reviewer` (opus), `gh_notif_issue`, `gh_notif_mention`,
+  `gh_notif_author`, `gh_notif_ci` (sonnet) — plus an adversarial
+  `gh_notif_verifier` (opus) on every PR-review draft. Delegation is
+  **synchronous and serial** (one sub-agent at a time, capped at the 5 newest
+  per tick); the orchestrator commits its `seen.tsv` state at the end. A daily
+  9am cron delivers the digest (with clickable links) to Discord, and a
+  retention cron prunes old binders.
+- **Verified live (2026-06-27):** one tick drafted **5 notifications routed to 5
+  distinct sub-agents** (pr_reviewer, mention, ci, author, issue) plus **1
+  verifier verdict** on the PR-review draft, then committed state —
+  *"delegated 5 ..., verified 1, deferred 0 ... Nothing was posted."* It is
+  **draft-only**: every sub-agent uses read-only `gh` and writes one local
+  markdown report — nothing is ever posted, commented, reviewed, labelled,
+  closed, merged, or marked read.
 
 ## Forkable
 The repo is a template: fork it, `gh auth login` (it reads *your* inbox —

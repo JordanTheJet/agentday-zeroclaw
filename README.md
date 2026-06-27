@@ -1,7 +1,7 @@
 # agentday-zeroclaw
 
-**A forkable, multi-agent GitHub-notification assistant — Hackathon Lane 3 (Most
-Innovative Use of Multiple Agents and Skills).**
+**A forkable, multi-agent GitHub-notification assistant — Track 3: Best
+Multi-Agent / Skill Composition.**
 
 Fork this, point it at *your* GitHub account, and it works through your whole
 notification inbox: it **plans** the inbox, **fans out one sub-agent per
@@ -10,8 +10,12 @@ high-stakes drafts, **composes with specialist skills**, and a **summarizer**
 assembles a dated digest. It **drafts only** — it never posts, reviews, labels,
 closes, or marks anything read without your explicit say-so.
 
-Run it interactively in **Claude Code**, or deploy it as scheduled agents on a
-**ZeroClaw** instance (poll-and-delegate + a daily digest to your chat channel).
+Run it interactively in **Claude Code** (parallel fan-out via the Agent/Task
+tool), or deploy it as scheduled agents on a **ZeroClaw** instance — a genuine,
+ZeroClaw-native multi-agent fan-out with **no Claude Code dependency**: a poll
+cron runs a sonnet orchestrator that uses ZeroClaw's built-in `delegate` tool to
+hand each new notification to one of six model-matched sub-agents (with an opus
+verifier re-checking PR-review drafts), plus a daily digest to your chat channel.
 
 ---
 
@@ -67,12 +71,21 @@ It's repo-agnostic — it reads **your** notification inbox via your `gh` auth, 
 there's nothing repo-specific to configure. See **[`SETUP.md`](SETUP.md)** for:
 
 - **Claude Code** — install the skills, authenticate `gh`, say *"orchestrate my
-  notifications"*.
+  notifications"*. The interactive path fans out sub-agents in parallel via the
+  Agent/Task tool.
 - **ZeroClaw** — install the skills, apply the parameterized cron template
   [`deploy/zeroclaw-cron.template.toml`](deploy/zeroclaw-cron.template.toml)
   (fill in your home path + your chat channel id), seed the state file, and
-  enable. Piece A polls and drafts as notifications arrive; Piece C delivers a
-  daily digest to your channel.
+  enable. This path runs **completely in ZeroClaw — no Claude Code dependency**.
+  Piece A is a poll cron that runs the sonnet orchestrator `gh_notif`: a
+  read-only delta script finds new notifications, then the orchestrator routes
+  each by reason/type and uses ZeroClaw's built-in `delegate` tool to hand it to
+  one of six model-matched sub-agents (`gh_notif_pr_reviewer`/opus,
+  `gh_notif_verifier`/opus, `gh_notif_issue`/sonnet, `gh_notif_mention`/sonnet,
+  `gh_notif_author`/sonnet, `gh_notif_ci`/sonnet) — synchronously, one at a time,
+  bounded by a per-tick cap, with the opus verifier re-checking each PR-review
+  draft before the script commits state. Piece C delivers a daily digest to your
+  channel.
 
 ## Safety
 

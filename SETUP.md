@@ -23,7 +23,7 @@ Two ways to run it; both are **draft-only** (read-only on GitHub).
 1. Install the skills to a stable path:
    `cp -R .claude/skills/* ~/.zeroclaw/skills/`
 2. Create the dirs:
-   `mkdir -p ~/.zeroclaw/workspace/gh-notif/{state,triage} ~/.zeroclaw/agents/gh_notif/workspace`
+   `mkdir -p ~/.zeroclaw/workspace/gh-notif/{state,triage} ~/.zeroclaw/agents/gh_notif/workspace ~/.zeroclaw/bin`
 3. **Seed the state** so the first tick doesn't draft your whole backlog:
    ```bash
    SK=~/.zeroclaw/skills/github-notification-orchestrator
@@ -33,26 +33,51 @@ Two ways to run it; both are **draft-only** (read-only on GitHub).
    bash $SK/scripts/notifications_delta.sh commit "$ST" "$B"
    ```
 4. Open `deploy/zeroclaw-cron.template.toml`, replace the placeholders
-   (`<HOME>`, `<MODEL_PROVIDER>`, `<DISCORD_CHANNEL_ID>`), back up your config
-   (`cp ~/.zeroclaw/config.toml ~/.zeroclaw/config.toml.bak`), and append it.
+   (`<HOME>`, `<MODEL_SONNET>`, `<MODEL_OPUS>`, `<DISCORD_CHANNEL_ID>`), back up
+   your config (`cp ~/.zeroclaw/config.toml ~/.zeroclaw/config.toml.bak`), and
+   append it. The template wires up the orchestrator (`gh_notif`) **plus six
+   sub-agents** and two risk profiles, so it's a few more blocks than before.
+   Model split: the orchestrator and four workers (`gh_notif_issue`,
+   `gh_notif_mention`, `gh_notif_author`, `gh_notif_ci`) use `<MODEL_SONNET>`;
+   `gh_notif_pr_reviewer` and `gh_notif_verifier` use `<MODEL_OPUS>`.
+   The template also wires a daily **retention** cron (`gh_notif_retention`) that
+   prunes binders older than 14 days — install its prune script so the job
+   resolves:
+   ```bash
+   cp deploy/gh-notif-retention.sh ~/.zeroclaw/bin/ && chmod +x ~/.zeroclaw/bin/gh-notif-retention.sh
+   ```
 5. Restart so the scheduler picks up the jobs: `zeroclaw service restart`.
 6. Verify before enabling: `zeroclaw agent -a gh_notif -m "reply: gh_notif online"`.
-7. Flip `enabled = true` on `[cron.gh_notif_poll]` (and `[cron.gh_notif_digest]`)
-   when ready. Start the poll at **every 30 min** to feel out cost, then tighten.
+   On a real tick the orchestrator routes each new notification to one sub-agent
+   via the `delegate` tool and waits for it to return (a draft file path) before
+   handling the next.
+7. Flip `enabled = true` on `[cron.gh_notif_poll]` (and `[cron.gh_notif_digest]`,
+   and `[cron.gh_notif_retention]` once its script is installed) when ready. Start
+   the poll at **every 30 min** to feel out cost, then tighten.
 
 ### Notes
 - **First-run cap.** The poll prompt caps drafts per tick, and seeding (step 3)
   means only *new* notifications draft — so you never get a backlog burst. The
   loop is at-least-once + restart-safe: a daemon restart only re-*drafts*, never
   re-posts (it's draft-only).
-- **Permissions.** The template uses a `yolo`-class risk profile so the agent's
-  shell can run the bundled scripts + read-only `gh`. The prompt is draft-only
-  and `gh` is read-only, so the blast radius is bounded — tighten
-  `allowed_commands` to `["bash","gh","python3","jq","date"]` if you prefer a
-  smaller surface (and re-test).
+- **Permissions.** The template ships **two** risk profiles. The orchestrator
+  (`gh_notif`) has `delegation_policy` mode `allow` plus a `delegates` roster
+  naming the six sub-agents, and lists `delegate` in the poll's `allowed_tools`
+  so it can hand work off. The sub-agents share `gh_notif_worker`, which is
+  identical on every axis *except* `delegation_policy` is `forbidden` (they
+  can't re-delegate or escalate — ZeroClaw enforces a no-escalation guard at
+  delegate time). Both are full-shell so the agents can run the bundled scripts
+  + read-only `gh`; the prompts are draft-only and `gh` is read-only, so the
+  blast radius is bounded — tighten `allowed_commands` to
+  `["bash","gh","python3","jq","date"]` on both profiles if you prefer a smaller
+  surface (and re-test).
 - **Cost.** Piece C (digest) is ~free (a deterministic index build + a short
   lede; it rolls up Piece A's drafts, never re-drafts). Piece A's cost scales
-  with how many *new* notifications arrive per tick.
+  with how many *new* notifications get drafted per tick: delegation is
+  **synchronous/serial** (the orchestrator delegates one sub-agent at a time and
+  waits for each), bounded by the per-tick cap of **5 newest** notifications. So
+  a tick is at most one orchestrator routing pass + up to 5 worker drafts + a
+  verifier pass on any PR-review draft — no runaway fan-out.
 - **Do you need Piece C?** Piece A drafts silently into the binder; Piece C is
   what *delivers* a single daily briefing to your chat and rebuilds the
   whole-day INDEX. Keep it unless you'll always open the binder folder yourself.
@@ -67,8 +92,9 @@ channel `bot_token`s.
   it is exactly the `gh_notif` agent + risk profile + cron jobs from a real
   deployment, with every secret/host value replaced by a `<PLACEHOLDER>`.
 - It's self-contained: the only blocks you add to a fresh ZeroClaw config are
-  `[risk_profiles.gh_notif]`, `[agents.gh_notif*]`, and `[cron.gh_notif*]` — no
-  providers/channels/tokens are part of the example.
+  `[risk_profiles.gh_notif]` + `[risk_profiles.gh_notif_worker]`,
+  `[agents.gh_notif*]` (the orchestrator + six sub-agents), and `[cron.gh_notif*]`
+  — no providers/channels/tokens are part of the example.
 - Before committing any config excerpt, verify it's clean:
   `grep -niE 'enc2:|sk-|gho_|ghp_|api_key|bot_token|paired_tokens' <file>` must
   return nothing.
