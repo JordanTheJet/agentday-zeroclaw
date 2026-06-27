@@ -176,7 +176,7 @@ WS=<HOME>/.zeroclaw/workspace/gh-notif
 1. Run `date +%F` -> DATE; BINDER=$WS/triage/<DATE>.
 2. If "$BINDER"/items does not exist or is empty, output EXACTLY one line and stop:
 **GitHub Notification Digest — <DATE>** — nothing new drafted today.
-3. Run: python3 "$SKILL"/scripts/build_index.py "$BINDER"  (builds INDEX.md; each item links to its full draft summary in the private drafts repo, if one is configured).
+3. Run: bash "$SKILL"/scripts/build_index.sh "$BINDER"  (builds INDEX.md; each item links to its full draft summary in the private drafts repo, if one is configured).
 4. Run: bash "$SKILL"/scripts/publish_drafts.sh "$WS"  (push today's drafts + INDEX to the PRIVATE drafts repo so the links resolve from chat/mobile; pushes to YOUR private repo ONLY, never posts upstream; no-op until .drafts-remote is set).
 5. Read "$BINDER"/INDEX.md. If a drafts repo is configured, each item bullet contains an absolute https://github.com/.../items/<file>.md link to that draft's full summary plus a "📂 All drafts (INDEX)" link; otherwise links are repo-relative.
 6. Output a concise digest. FIRST line EXACTLY: **GitHub Notification Digest — <DATE>**. Then, for EACH P1 "needs you" item, one line: a masked clickable link [#number title](<DRAFT_URL>) — the one-line ask (from that report's "Who needs what from you"), where DRAFT_URL is that item's draft-summary link copied from INDEX.md. Then a one-line count of P2/P3, each as a masked link [#number](<DRAFT_URL>). Make EVERY link a masked link [text](<url>) with the URL wrapped in angle brackets so chat shows no preview card. End with a footer line linking the INDEX: All drafts: [triage/<DATE>](<INDEX_URL>). No images.
@@ -210,12 +210,12 @@ expr = "0 4 * * *"
 # the thread as a COMMENT via gh. It is DETERMINISTIC (no LLM in the posting path)
 # and comments ONLY — never review/approve/request-changes/merge/close/label.
 # Ships DISABLED: flip enabled=true for hands-off auto-post of accepted drafts, or
-# run scripts/ship_accepted.py <workspace> (dry-run by default; add --post) by hand.
+# run scripts/ship_accepted.sh <workspace> (dry-run by default; add --post) by hand.
 [cron.gh_notif_ship]
 name = "GitHub notification shipper (post accepted drafts)"
 enabled = false
 job_type = "shell"
-command = "python3 <HOME>/.zeroclaw/skills/github-notification-orchestrator/scripts/ship_accepted.py <HOME>/.zeroclaw/workspace/gh-notif --post"
+command = "bash <HOME>/.zeroclaw/skills/github-notification-orchestrator/scripts/ship_accepted.sh <HOME>/.zeroclaw/workspace/gh-notif --post"
 
 [cron.gh_notif_ship.schedule]
 kind = "every"

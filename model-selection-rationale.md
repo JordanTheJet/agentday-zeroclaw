@@ -40,7 +40,7 @@ which is the whole point of per-role selection.
 | **mention-responder** | **sonnet** | Drafting a contextual reply needs good language + light reasoning, not code analysis — at 60% of Opus's output cost. |
 | **author-activity-responder** | **sonnet** | Summarize what changed on your own thread and propose the next move: summarization + light judgment. |
 | **ci-failure-investigator** | **sonnet** | Parse CI logs to the root-cause line + failing test — pattern extraction with some reasoning. Escalate a non-obvious failure (flaky, cross-crate, miscompile) to **opus**. Not Haiku: logs are noisy and the root cause is rarely the last red line. |
-| **daily-summarizer** | **haiku** | Collating the written reports into a sorted, linked index is mechanical — and a *script* (`build_index.py`) does the sorting/linking deterministically, so the model only writes a short lede over pre-structured data. The cheapest fast model is ideal; Opus here is pure waste. |
+| **daily-summarizer** | **haiku** | Collating the written reports into a sorted, linked index is mechanical — and a *script* (`build_index.sh`) does the sorting/linking deterministically, so the model only writes a short lede over pre-structured data. The cheapest fast model is ideal; Opus here is pure waste. |
 
 ## Overrides
 

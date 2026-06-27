@@ -64,7 +64,7 @@ links to each draft from chat/mobile**, mirror the binder to a *private* GitHub 
 
 That's it — the poll and digest crons already call `publish_drafts.sh`, which is a
 no-op until `.drafts-remote` exists. Once set, every line of the daily digest is a
-masked GitHub link to that draft's rendered summary, and `build_index.py` emits
+masked GitHub link to that draft's rendered summary, and `build_index.sh` emits
 absolute GitHub URLs. **Keep this repo private** — the drafts contain unsent
 replies and candid verifier verdicts about other people's PRs; never publish them.
 
@@ -78,7 +78,7 @@ Each draft carries a "Ready-to-post comment" block and `status: needs-reply`. To
    and records the comment URL.
 
 Run it either way:
-- **Manual:** `python3 ~/.zeroclaw/skills/github-notification-orchestrator/scripts/ship_accepted.py ~/.zeroclaw/workspace/gh-notif`
+- **Manual:** `bash ~/.zeroclaw/skills/github-notification-orchestrator/scripts/ship_accepted.sh ~/.zeroclaw/workspace/gh-notif`
   — dry-run by default (prints exactly what it WOULD post); add `--post` to send,
   `--repo OWNER/REPO` / `--only SUBSTR` to scope a run.
 - **Hands-off:** flip `enabled = true` on `[cron.gh_notif_ship]`; it sweeps
