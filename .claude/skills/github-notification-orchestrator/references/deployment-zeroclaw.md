@@ -568,3 +568,20 @@ explicit confirm before `--open`). `show` ends with `[COMPONENTS:]` buttons
 `slash_commands = true` on the channel; the skill installed in a **bundle**
 attached to `gh_notif_chat` (`skill_bundles`); and the operator's Discord id in a
 `[peer_groups.*].external_peers` allowlist (slash + buttons are gated to it).
+
+## Review with evidence (sandboxed) — `review_evidence.sh`
+
+The harness's *main* job isn't writing code — it's reviewing PRs **with evidence**.
+For a `review_requested` draft, `scripts/review_evidence.sh <ws> --only <draft>`
+fetches the PR's head (read-only `gh`) into a **throwaway worktree**, runs the
+validation battery, and appends a **`## Build evidence`** section (pass/fail + head
+SHA + last output) to that PR's review draft, then pushes. It never posts or opens a
+PR, and the worktree is always deleted.
+
+**Sandboxed by default.** Building/testing a PR *executes that PR's code* (build.rs,
+proc-macros, and with `--deep` its tests), so the battery runs inside an **ephemeral
+container** (docker/podman) with ONLY the PR worktree mounted — host secrets are not
+exposed. If no container runtime is present it **refuses** (untrusted code) unless
+`--allow-host` is passed. Default battery is `cargo check`; `--deep` runs
+fmt + clippy + test. (Writing code for an assigned issue — `ship_pr.sh` — is the
+*other* use; it works on your own change in an ephemeral worktree.)

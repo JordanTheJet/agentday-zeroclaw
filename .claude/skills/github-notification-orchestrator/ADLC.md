@@ -173,6 +173,15 @@ dedup, no audit trail.
   a post-run verifier (the no-attribution repo rule had been only *instructed*),
   fork preflight, exact-basename `--only`, and `--open` refusing a bare mass-fire.
 
+- **v10 — review-with-evidence + sandboxing.** Added `review_evidence.sh`: for a
+  PR review draft, fetch the PR head (read-only) into a throwaway worktree, run the
+  battery, and append a `## Build evidence` section (pass/fail + head SHA + output)
+  to the draft. This is the harness's MAIN use (build/test others' PRs for grounded
+  review) vs. `ship_pr.sh` (write a PR — only for assigned issues). Because building
+  a PR executes its code, the battery runs in an **ephemeral container** by default
+  (only the worktree mounted; host secrets unexposed) and **refuses** on the host
+  unless `--allow-host`. Proven end-to-end on PR #8247 (`cargo check` ✅).
+
 **Final:** spec-valid; **2 real bugs + 4 grounding/doc errors caught and fixed**
 by the verifier / adversarial-critic layers before they shipped. The with-skill
 output is a verified, linked, dated digest; the delta vs no-skill is the
