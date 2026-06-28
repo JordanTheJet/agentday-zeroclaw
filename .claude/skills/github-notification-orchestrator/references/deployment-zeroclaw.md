@@ -535,3 +535,36 @@ the poll as the reconciliation backstop) — but it is out of scope here.
 So the migration is additive: A and C don't change; B is a lower-latency front
 door onto the same idempotent loop, and the at-least-once / draft-only properties
 carry over unchanged.
+
+## Phase 3 — accept code → draft PR (`ship_pr.sh`)
+
+For a draft whose right answer is a *code change*, flip its frontmatter to
+`status: implement`; `scripts/ship_pr.sh` then turns it into a **draft PR from your
+fork**. It clones the fork (adds an `upstream` remote), makes a worktree off
+**fresh `upstream/master`** (no fork-master sync), and runs a **local agentic
+harness** — Claude Code CLI by default (it natively uses the `github-pr` skill,
+which fills the repo PR template, runs the validation battery, and enforces
+no-attribution), or ZeroClaw `zerocoder` as a fallback. (claude.ai/code is *not*
+used — it can't be driven programmatically.)
+
+- **Dry-run by default.** `--prepare` does the git toil only; `--open` runs the
+  harness and **requires `--only <file>` or `--repo`** (no bare mass-fire; refuses
+  if >1 draft matches).
+- **Hardened (security review):** the draft body is third-party content, so it is
+  fenced as UNTRUSTED in the harness prompt with standing guardrails (push only to
+  the fork; exactly one DRAFT PR to the pre-derived repo; no posting/secrets/
+  out-of-worktree). A **deterministic `commit-msg` hook** strips bot/AI attribution
+  on every commit (the repo rule is enforced, not just instructed), with a post-run
+  verifier. Needs the `claude` CLI; `GH_NOTIF_CLAUDE_FLAGS` overrides permissions.
+
+## Discord control surface (slash + buttons)
+
+A `gh_notif_chat` agent owns inbound on `discord.default` and serves the `gh-draft`
+slash command — `/gh-draft <text>` parses `ask | edit | show | accept | implement`
++ a draft `#number` + free text. `edit` rewrites the draft and pushes the private
+repo; `accept` → `ship_accepted.sh`; `implement` → `ship_pr.sh` (dry-run, then an
+explicit confirm before `--open`). `show` ends with `[COMPONENTS:]` buttons
+(Edit / Accept & post / Open PR) that re-invoke the skill on click. Setup:
+`slash_commands = true` on the channel; the skill installed in a **bundle**
+attached to `gh_notif_chat` (`skill_bundles`); and the operator's Discord id in a
+`[peer_groups.*].external_peers` allowlist (slash + buttons are gated to it).

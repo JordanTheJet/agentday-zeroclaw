@@ -220,3 +220,29 @@ command = "bash <HOME>/.zeroclaw/skills/github-notification-orchestrator/scripts
 [cron.gh_notif_ship.schedule]
 kind = "every"
 every_ms = 900000
+
+# ── Discord chat + Phase 3 (OPTIONAL): edit/act on drafts from Discord ────────
+# A chat agent owns inbound on Discord and serves the `gh-draft` slash command:
+#   /gh-draft <text>   →  ask | edit | show | accept | implement  a draft
+# accept → the comment shipper (ship_accepted.sh); implement → ship_pr.sh, which
+# builds a DRAFT PR from your fork via a LOCAL Claude Code harness + the github-pr
+# skill (no claude.ai/code — not automatable). Extra manual setup (see SETUP.md):
+#   1. set `slash_commands = true` on [channels.discord.default];
+#   2. install the gh-draft skill into a bundle and reference it below
+#      (`zeroclaw skills bundle add ghnotif`, then drop the skill in shared/skills/ghnotif/);
+#   3. authorize YOUR Discord user id via a [peer_groups.*] external_peers entry;
+#   4. Phase 3 needs the `claude` CLI installed on the host.
+[agents.gh_notif_chat]
+enabled = true
+model_provider = "<MODEL_SONNET>"
+risk_profile = "gh_notif_worker"
+runtime_profile = "unbounded"
+channels = ["discord.default"]
+skill_bundles = ["ghnotif"]
+
+[agents.gh_notif_chat.identity]
+format = "openclaw"
+
+# [peer_groups.gh_notif]                          # authorize slash/button users:
+# channel = "discord.default"
+# external_peers = ["<YOUR_DISCORD_USER_ID>"]     # or "*" = everyone (unsafe: accept/implement can reach upstream)

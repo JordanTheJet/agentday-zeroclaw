@@ -116,6 +116,36 @@ becomes `posted`). Start with the manual dry-run before enabling the cron.
   what *delivers* a single daily briefing to your chat and rebuilds the
   whole-day INDEX. Keep it unless you'll always open the binder folder yourself.
 
+## Optional: drive it from Discord (slash commands) + Phase 3 (code → PR)
+
+**Discord chat (`/gh-draft`):**
+1. Install the `gh-draft` skill into a bundle attached to the chat agent:
+   ```bash
+   zeroclaw skills bundle add ghnotif
+   cp -R .claude/skills/gh-draft ~/.zeroclaw/shared/skills/ghnotif/
+   ```
+   (the template's `[agents.gh_notif_chat]` already sets `skill_bundles = ["ghnotif"]`
+   + `channels = ["discord.default"]`).
+2. Set `slash_commands = true` under `[channels.discord.default]`.
+3. Authorize yourself — slash commands **and** buttons are gated to an allowlist:
+   ```toml
+   [peer_groups.gh_notif]
+   channel = "discord.default"
+   external_peers = ["<YOUR_DISCORD_USER_ID>"]
+   ```
+   (if you get *"you're not authorized to use this command here"*, your id is in the
+   daemon trace's "unauthorized interaction" warning).
+4. Restart. In Discord: `/gh-draft show #1234`, `/gh-draft edit #1234 <change>`,
+   `/gh-draft ask #1234 <q>`, `/gh-draft accept #1234`, `/gh-draft implement #1234`.
+   `show` includes Edit / Accept / Open-PR buttons. Global commands take up to ~1h to
+   appear in the client; `slash_command_scope = "guild"` + `guild_ids` is instant.
+
+**Phase 3 (accept code → draft PR):** `implement` (or `scripts/ship_pr.sh <ws>
+--only <file>`) builds a **draft PR from your fork** via a local **Claude Code**
+harness (install the `claude` CLI) + the `github-pr` skill (which enforces the
+PR template + no-attribution). Dry-run by default; `--open` (requires `--only`/`--repo`)
+actually clones, builds, and opens a **draft** PR — review it before marking Ready.
+
 ## Sharing your ZeroClaw config safely (no secrets)
 
 To show a working ZeroClaw setup without leaking anything: **never commit
