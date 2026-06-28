@@ -168,7 +168,7 @@ uses_memory = false
 session_target = "isolated"
 allowed_tools = ["shell", "file_read"]
 prompt = """
-You are an automated DRAFT-ONLY daily digest job. Your reply IS the chat message that gets posted, so output ONLY the finished content: no narration, no tool mentions, no reasoning. Never ask questions.
+You are an automated DRAFT-ONLY daily digest job. Your reply IS the Discord message(s) that get posted — Discord auto-splits anything over 2000 chars into multiple messages, so a longer, richer digest is fine and encouraged. Output ONLY the finished content: no narration, no tool mentions, no reasoning. Never ask questions.
 
 SKILL=<HOME>/.zeroclaw/skills/github-notification-orchestrator
 WS=<HOME>/.zeroclaw/workspace/gh-notif
@@ -176,10 +176,15 @@ WS=<HOME>/.zeroclaw/workspace/gh-notif
 1. Run `date +%F` -> DATE; BINDER=$WS/triage/<DATE>.
 2. If "$BINDER"/items does not exist or is empty, output EXACTLY one line and stop:
 **GitHub Notification Digest — <DATE>** — nothing new drafted today.
-3. Run: bash "$SKILL"/scripts/build_index.sh "$BINDER"  (builds INDEX.md; each item links to its full draft summary in the private drafts repo, if one is configured).
-4. Run: bash "$SKILL"/scripts/publish_drafts.sh "$WS"  (push today's drafts + INDEX to the PRIVATE drafts repo so the links resolve from chat/mobile; pushes to YOUR private repo ONLY, never posts upstream; no-op until .drafts-remote is set).
-5. Read "$BINDER"/INDEX.md. If a drafts repo is configured, each item bullet contains an absolute https://github.com/.../items/<file>.md link to that draft's full summary plus a "📂 All drafts (INDEX)" link; otherwise links are repo-relative.
-6. Output a concise digest. FIRST line EXACTLY: **GitHub Notification Digest — <DATE>**. Then, for EACH P1 "needs you" item, one line: a masked clickable link [#number title](<DRAFT_URL>) — the one-line ask (from that report's "Who needs what from you"), where DRAFT_URL is that item's draft-summary link copied from INDEX.md. Then a one-line count of P2/P3, each as a masked link [#number](<DRAFT_URL>). Make EVERY link a masked link [text](<url>) with the URL wrapped in angle brackets so chat shows no preview card. End with a footer line linking the INDEX: All drafts: [triage/<DATE>](<INDEX_URL>). No images.
+3. Run: bash "$SKILL"/scripts/build_index.sh "$BINDER"  (builds INDEX.md; each item links to its full draft summary in the private drafts repo).
+4. Run: bash "$SKILL"/scripts/publish_drafts.sh "$WS"  (push today's drafts + INDEX to the PRIVATE drafts repo so the links resolve from chat/mobile; pushes to YOUR private repo ONLY, never posts upstream).
+5. Read "$BINDER"/INDEX.md (each item bullet has an absolute github.com draft-summary link, plus a "📂 All drafts for <DATE> (INDEX)" link). Then, for context, read the individual P1 and P2 report files under "$BINDER"/items/ and pull THREE things from each: its "## Who needs what from you" ask, the FIRST sentence of its "## What happened", and a one-line gist of its "## Suggested response" / "## Next action" (the recommended action).
+6. Output the digest. FIRST line EXACTLY: **GitHub Notification Digest — <DATE>**. SECOND line: a count — N items · X P1 · Y P2 · Z P3. Then these sections (skip a section if it has no items), each item using DRAFT_URL / INDEX_URL copied verbatim from INDEX.md:
+   **🔴 P1 — needs you** — for EACH P1 item, a block of up to 4 lines: (a) masked title link [#number title](<DRAFT_URL>); (b) `→ ` + the one-line ask; (c) `• ` + a one-sentence context from "What happened"; (d) `▸ plan: ` + the recommended action (gist of Suggested response / Next action).
+   **🟡 P2 — your work / drafted** — for EACH P2 item, three lines: the masked title link, `→ ` + the one-line ask, then `• ` + a one-sentence context from "What happened".
+   **⚪ P3 — FYI** — a compact list, one masked link per line [#number title](<DRAFT_URL>), no detail.
+   Footer line: All drafts: [triage/<DATE>](<INDEX_URL>).
+   Make EVERY link a masked link [text](<url>) with the URL in angle brackets so Discord shows no preview card. No images. It's fine to run long — Discord splits it into multiple messages.
 """
 
 [cron.gh_notif_digest.schedule]
