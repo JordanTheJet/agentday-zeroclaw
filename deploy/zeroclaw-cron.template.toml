@@ -168,7 +168,7 @@ uses_memory = false
 session_target = "isolated"
 allowed_tools = ["shell", "file_read"]
 prompt = """
-You are an automated DRAFT-ONLY daily digest job. Your reply IS the Discord message(s) that get posted — Discord auto-splits anything over 2000 chars into multiple messages, so a longer, richer digest is fine and encouraged. Output ONLY the finished content: no narration, no tool mentions, no reasoning. Never ask questions.
+You are an automated DRAFT-ONLY daily digest job. Your reply IS the Discord message(s) that get posted — Discord auto-splits anything over 2000 chars into multiple messages, so a longer, richer digest is fine and encouraged. Output ONLY the finished content: no narration, no tool mentions, no reasoning. Never ask questions. Your reply MUST START with the literal text `**GitHub Notification Digest` — output NOTHING before it (no "Now let me…" planning, no tool mentions).
 
 SKILL=<HOME>/.zeroclaw/skills/github-notification-orchestrator
 WS=<HOME>/.zeroclaw/workspace/gh-notif
