@@ -1,0 +1,72 @@
+# ~/.config/systemd/user/zeroclaw.service
+#
+# systemd --user unit for the ZeroClaw gh_notif DRAFT-ONLY triage daemon on a
+# 24/7 Linux host. Runs as <USER> with the real HOME so the host-bound
+# ~/.zeroclaw/.secret_key (mode 0600), the enc2: provider keys + the Discord
+# bot_token in config.toml, gh auth, and the git credential helper all resolve.
+# A /etc/systemd/system (root) unit would NOT see these cleanly.
+#
+# Pair with:   loginctl enable-linger <USER>   (start at boot, survive logout).
+# Replace <HOME> (e.g. /home/you) and <USER> (e.g. you).
+# Set the PATH below from `command -v zeroclaw gh git claude podman` on the box.
+#
+#   Lowest-effort alternative: `zeroclaw service install --service-init systemd`
+#   generates an equivalent --user unit. Use THIS hand-written file when you want
+#   to pin PATH / RestartSec / TZ / journald behavior explicitly.
+
+[Unit]
+Description=ZeroClaw daemon (gh_notif GitHub-notification triage orchestrator, draft-only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Absolute path — systemd does NOT honor your interactive shell PATH for ExecStart.
+ExecStart=<HOME>/.cargo/bin/zeroclaw daemon --config-dir <HOME>/.zeroclaw
+
+WorkingDirectory=<HOME>/.zeroclaw
+Environment=HOME=<HOME>
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+# The 9am digest + 4am retention crons fire in LOCAL time — pin TZ so the hour is
+# unambiguous even if /etc/localtime differs. Match the source host's zone.
+Environment=TZ=America/New_York
+# PATH is load-bearing: the daemon shells out to gh/git/claude/podman. systemd's
+# default PATH (/usr/local/bin:/usr/bin:/bin) misses ~/.local/bin and ~/.cargo/bin.
+Environment=PATH=<HOME>/.local/bin:<HOME>/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# If you auth providers/claude via tokens instead of interactive login, prefer an
+# EnvironmentFile (mode 0600) over inline secrets:
+# EnvironmentFile=-<HOME>/.zeroclaw/zeroclaw.env
+
+# --- Restart policy ----------------------------------------------------------
+Restart=always
+RestartSec=5
+# Don't let a crash-loop hammer the provider APIs / Discord gateway.
+StartLimitIntervalSec=300
+StartLimitBurst=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+
+# --- Logging -> journald -----------------------------------------------------
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=zeroclaw
+
+# --- Light hardening (loosen if a shell-out breaks) --------------------------
+NoNewPrivileges=true
+# ProtectSystem=strict
+# ReadWritePaths=<HOME>/.zeroclaw
+
+[Install]
+WantedBy=default.target
+
+# ─────────────────────────── enable / start / logs ──────────────────────────
+# 0) STOP the OLD source-host daemon FIRST (single-daemon rule — see REMOTE_SETUP.md).
+# 1) loginctl enable-linger <USER>        # verify: loginctl show-user <USER> -p Linger -> yes
+# 2) mkdir -p <HOME>/.config/systemd/user ; save this file there
+#    systemctl --user daemon-reload
+#    systemctl --user enable --now zeroclaw.service
+# 3) systemctl --user status zeroclaw.service
+#    journalctl --user -u zeroclaw.service -f
+# 4) Apply a config edit:  systemctl --user restart zeroclaw.service
+# A shell-out that "works in my shell but not under systemd" is almost always
+# PATH or HOME — confirm both in [Service] above.

@@ -162,3 +162,22 @@ channel `bot_token`s.
 - Before committing any config excerpt, verify it's clean:
   `grep -niE 'enc2:|sk-|gho_|ghp_|api_key|bot_token|paired_tokens' <file>` must
   return nothing.
+
+## Running 24/7 on a remote host
+
+To move a live deployment to an always-on box (and supervise it without launchd):
+
+1. On the source host: `bash deploy/migrate.sh` packages the must-transfer state
+   into one tarball (config + `.secret_key` + `seen.tsv` + drafts clone + skills +
+   a checkpoint-clean memory DB) and **excludes** the ~143 MB scratch clone and all
+   per-host runtime. It is read-only on `~/.zeroclaw`. It also emits a
+   `SECRETS-TO-SET.txt` checklist computed from your actual host.
+2. Follow [`deploy/REMOTE_SETUP.md`](deploy/REMOTE_SETUP.md) — it covers the
+   single-daemon cutover, secret portability (the `enc2:` key file is host-portable,
+   the gh token is not), the `/Users → $HOME` path rewrite (+ the Linux `/home`
+   `forbidden_paths` trap), timezone (the digest cron fires in local time), and
+   bringing the daemon up under the [`deploy/zeroclaw.service`](deploy/zeroclaw.service)
+   systemd `--user` unit (`loginctl enable-linger` for boot/logout survival).
+
+The drafts-only invariant is preserved across the move: `gh_notif_ship` stays
+`enabled = false`, so nothing posts upstream during or after migration.
