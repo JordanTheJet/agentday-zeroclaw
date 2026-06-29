@@ -1,5 +1,12 @@
 # Deployment — running the orchestrator on a ZeroClaw scheduler
 
+> **Authoritative config:** the shipped, copy-pasteable deployment is
+> [`deploy/zeroclaw-cron.template.toml`](../../../../deploy/zeroclaw-cron.template.toml),
+> which keys state off `<HOME>/.zeroclaw/workspace/gh-notif/…`. The inline TOML
+> snippets **below use a shorter `.context/triage/…` path for illustration** — if
+> you deploy, follow the template's `~/.zeroclaw/workspace/gh-notif` paths (the
+> retention cron + `publish_drafts.sh` read from there) rather than mixing the two.
+
 This is the **deployment layer** for the notification orchestrator: how to run it
 unattended on ZeroClaw's built-in cron, instead of (or alongside) the interactive
 `/github-notification-orchestrator` skill. The interactive skill drains the *whole*
