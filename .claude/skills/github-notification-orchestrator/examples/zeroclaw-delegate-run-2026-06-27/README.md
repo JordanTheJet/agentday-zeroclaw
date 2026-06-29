@@ -49,5 +49,5 @@ the delta script committed state — all draft-only.
   escalate — ZeroClaw enforces a no-escalation guard at delegate time).
 
 See [`../../references/deployment-zeroclaw.md`](../../references/deployment-zeroclaw.md)
-and [`deploy/zeroclaw-cron.template.toml`](deploy/zeroclaw-cron.template.toml) for
+and [`deploy/zeroclaw-cron.template.toml`](../../../../../deploy/zeroclaw-cron.template.toml) for
 the full wiring.

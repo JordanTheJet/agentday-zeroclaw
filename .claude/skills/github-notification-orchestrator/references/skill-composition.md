@@ -12,6 +12,13 @@ applies here, one level up: the orchestrator plans and pre-drafts across the
 
 ## The skills it composes with
 
+> **Forker note:** only `github-duplicate-check` and `gh-draft` are bundled in this
+> repo. `github-pr-review-session`, `github-issue-triage`, and
+> `daily-notification-triage` are **optional** composition targets you install
+> separately — the core draft-only flow works without them (the hand-off writes
+> `tmp/handoff.md` and *names* the next skill to invoke rather than calling it, so a
+> missing specialist degrades gracefully instead of erroring).
+
 | Notification class | Compose with | What the orchestrator hands over |
 |---|---|---|
 | `review_requested`, code-focused PR mentions | **`github-pr-review-session`** | The pre-review binder entry (diff read, findings tagged, verifier verdict) + a review queue in `tmp/handoff.md`. The specialist owns the posting protocol and posts in the reviewer's voice. |

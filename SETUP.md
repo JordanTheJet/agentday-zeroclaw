@@ -2,14 +2,39 @@
 
 Two ways to run it; both are **draft-only** (read-only on GitHub).
 
+## Prerequisites
+- **Command-line tools the scripts call:** `gh` (GitHub CLI), `git`, `jq`, and
+  `rsync` (`rsync` only for the optional drafts mirror); `awk`/`bash` are assumed.
+  Debian/Ubuntu: `sudo apt-get install -y gh git jq rsync`.
+- **(ZeroClaw path only) the `zeroclaw` binary, ≥ 0.8.2.** It is built from source
+  (not on crates.io) — the cron template uses version-gated features (`delegate`,
+  `delegation_policy`, `runtime_profile`, `skill_bundles`, `slash_commands`):
+  ```bash
+  # install Rust, then build + install zeroclaw
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && . "$HOME/.cargo/env"
+  git clone https://github.com/zeroclaw-labs/zeroclaw.git && cd zeroclaw && cargo install --path .
+  zeroclaw --version      # expect 0.8.2+
+  zeroclaw quickstart     # creates ~/.zeroclaw/config.toml + a provider
+  ```
+  (Phase 3 PR-building additionally needs the `claude` CLI.)
+
 ## What you provide (your parameters / secrets)
 - **Your GitHub account.** The skills read *your* notification inbox via the `gh`
-  CLI — nothing is repo-specific, so there's no repo to configure. Just
-  `gh auth login` (read scope is enough).
+  CLI — nothing is repo-specific, so there's no repo to configure. Authenticate
+  **with the `notifications` scope** — the inbox fetch needs it, and a bare
+  `gh auth login` web flow does **not** grant it:
+  ```bash
+  gh auth login --hostname github.com --git-protocol https --scopes 'notifications,repo,read:org'
+  gh api notifications --jq 'length'    # preflight: must NOT 403
+  ```
+  (add `workflow` only if you'll use Phase 3 PR builds.)
 - **A model provider key.** Claude (Anthropic) recommended. In Claude Code it's
-  already set; in ZeroClaw set it in `~/.zeroclaw/config.toml`.
-- **(ZeroClaw digest only) a chat channel id** — e.g. your Discord DM channel id,
-  where the daily digest is delivered.
+  already set; in ZeroClaw set it in `~/.zeroclaw/config.toml` (via `zeroclaw quickstart`).
+- **(ZeroClaw digest only) a chat channel.** The daily digest delivers to a chat
+  channel via `[channels.discord.default]` (create a Discord app + bot, enable the
+  **Message Content Intent**, set its `bot_token`). This is a prerequisite *only if
+  you enable the digest cron* — if you skip it, leave `[cron.gh_notif_digest]`
+  disabled and Piece A still drafts into the on-host binder (the default delivery).
 
 ## Option A — Claude Code (interactive)
 1. Copy `.claude/skills/github-notification-orchestrator` and
@@ -24,7 +49,9 @@ Two ways to run it; both are **draft-only** (read-only on GitHub).
    `cp -R .claude/skills/* ~/.zeroclaw/skills/`
 2. Create the dirs:
    `mkdir -p ~/.zeroclaw/workspace/gh-notif/{state,triage} ~/.zeroclaw/agents/gh_notif/workspace ~/.zeroclaw/bin`
-3. **Seed the state** so the first tick doesn't draft your whole backlog:
+3. **Seed the state** so the first tick doesn't draft your whole backlog. (This
+   calls `gh api notifications` — if it errors, your token is missing the
+   `notifications` scope; re-run the `gh auth login` above.)
    ```bash
    SK=~/.zeroclaw/skills/github-notification-orchestrator
    ST=~/.zeroclaw/workspace/gh-notif/state
@@ -142,8 +169,8 @@ becomes `posted`). Start with the manual dry-run before enabling the cron.
 
 **Phase 3 (accept code → draft PR):** `implement` (or `scripts/ship_pr.sh <ws>
 --only <file>`) builds a **draft PR from your fork** via a local **Claude Code**
-harness (install the `claude` CLI) + the `github-pr` skill (which enforces the
-PR template + no-attribution). Dry-run by default; `--open` (requires `--only`/`--repo`)
+harness (install the `claude` CLI) + the `github-pr` skill (a separate skill you
+install for Phase 3 — it enforces the PR template + no-attribution). Dry-run by default; `--open` (requires `--only`/`--repo`)
 actually clones, builds, and opens a **draft** PR — review it before marking Ready.
 
 ## Sharing your ZeroClaw config safely (no secrets)

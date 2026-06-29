@@ -41,6 +41,9 @@ prompts:
 | `verifier` | opus | Adversarial quality gate on high-stakes drafts |
 | `daily-summarizer` | haiku | Build the dated INDEX (a script does the sorting) |
 
+(The ZeroClaw poll delegates to **six** of these as live sub-agents; the seventh,
+`daily-summarizer`, is the deterministic `build_index.sh` step — not a delegated agent.)
+
 **Model choices and the reasoning behind them:** see
 **[`model-selection-rationale.md`](model-selection-rationale.md)**.
 
@@ -97,3 +100,8 @@ Acting on a draft is opt-in: you set a draft's `status: accepted`, and a
 deterministic shipper posts just its marked reply block as a **comment** (never a
 review/approval/merge/close/label) — see [`SETUP.md`](SETUP.md). See
 [`safety.md`](.claude/skills/github-notification-orchestrator/references/safety.md).
+
+## License
+
+[MIT](LICENSE) — fork it, run it, adapt it. The bundled skills are
+[agentskills.io](https://agentskills.io)-spec and declare `license: MIT` to match.

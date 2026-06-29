@@ -3,3 +3,15 @@ triage/
 .context/
 tmp/
 *.log
+
+# secrets — never commit (these normally live under ~/.zeroclaw, outside the repo;
+# this is defense-in-depth in case a config copy is edited in-tree)
+config.toml
+config.toml.*
+.secret_key
+*.secret_key
+auth-profiles.json
+.env
+*.env
+.drafts-remote
+*.tar.gz
