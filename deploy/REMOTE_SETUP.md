@@ -257,6 +257,41 @@ systemctl --user status zeroclaw.service
 > No-systemd fallback: see the tmux/nohup + `@reboot` cron runbook in
 > [`zeroclaw-cron.template.toml`](./zeroclaw-cron.template.toml) header / the deploy notes.
 
+### 8a. WSL (Windows host) specifics — required for true 24/7
+
+WSL is a normal Linux userland, so everything above applies, but the host is
+Windows and that changes *liveness*:
+
+- **Enable systemd in WSL2** (off by default on older installs) or the `--user`
+  unit + `loginctl` won't work. In the distro:
+  ```bash
+  printf '[boot]\nsystemd=true\n' | sudo tee -a /etc/wsl.conf
+  ```
+  Then from **Windows** (PowerShell): `wsl --shutdown`, reopen the distro, and
+  `systemctl is-system-running` should respond. If you can't enable systemd, use
+  the tmux/nohup fallback instead.
+- **The distro must stay running.** WSL stops when its last process exits or
+  Windows sleeps — which kills the daemon and makes the 9am cron miss. Two fixes,
+  do both:
+  1. `loginctl enable-linger "$USER"` keeps the user-manager (and the daemon) up
+     while the distro lives — but the distro must be *launched* at boot. Add a
+     **Windows Task Scheduler** task "At log on / At startup" running:
+     `wsl.exe -d <Distro> -u <user> -- systemctl --user start zeroclaw.service`
+     (or just `wsl.exe -d <Distro> -- true` to warm the distro so linger takes over).
+  2. **Stop Windows from sleeping** (Settings → Power → Screen & sleep → Never, or
+     `powercfg /change standby-timeout-ac 0`). A sleeping host pauses WSL and the
+     cron clock, so the digest fires late or not at all.
+- **Reaching the dashboard from Windows:** the gateway binds `127.0.0.1:42617`
+  inside WSL; WSL2 forwards localhost, so open `http://localhost:42617` in the
+  Windows browser. No tunnel needed on the same box (use the SSH tunnel only to
+  reach it from a *different* machine).
+- **Clock:** WSL can drift after a host sleep; set the zone with `timedatectl`
+  (step 4) and it resyncs on resume.
+- **Paths:** the source `$HOME` (`/Users/...`) rewrites to the WSL `$HOME`
+  (`/home/<user>`), same as any Linux box (step 6). Keep everything inside the WSL
+  filesystem (`~`), not `/mnt/c/...` — the Windows-mounted drives are slow and have
+  different permission semantics that break `chmod 600` on `.secret_key`.
+
 ---
 
 ## 9. Verify
